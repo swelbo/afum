@@ -6,12 +6,15 @@ library(shiny)
 library(shinydashboard)
 library(adegenet)
 library(DT)
+library(ggfortify)
+library(shinycssloaders)
 
 
 #### Data ####
 db <- read.csv(file = "~/Documents/Imperial/R_folder/Shiny/STRAF/straf_db_shiny_only_2.csv")
 #db <- read.csv(file = "~/Desktop/R_folder/Shiny/STRAF/straf_db_shiny_only.csv")
-db <- db[,3:14]
+#head(db)
+db <- db[,2:12]
 head(db)
 straf <- c("X2A", "X2B", "X2C", "X3A", "X3B", "X3C", "X4A", "X4B", "X4C")
 
@@ -25,26 +28,26 @@ ui = dashboardPage(
                 choices = c(levels(db$Country))),
     #selectInput("country", "Choose a Continent:",
                 #choices = c(levels(db$Continent))),
-    selectInput("pop", "Choose a Population:",
-                choices = c(levels(db$Population), "C")),
+    #selectInput("pop", "Choose a Population:",
+                #choices = c(levels(db$Population), "C")),
     #selectInput("country", "Choose a Mutation:",
                 #choices = c(levels(db$Mutation))),
-    numericInput(inputId = "straf2a", label="Allele 2A", value="20", width = 180, min = 0, max = 400),
-    numericInput(inputId = "straf2b", label="Allele 2B", value="20", width = 180, min = 0, max = 400),
-    numericInput(inputId = "straf2c", label="Allele 2C", value="20", width = 180, min = 0, max = 400),
-    numericInput(inputId = "straf3a", label="Allele 3A", value="20", width = 180, min = 0, max = 400),
-    numericInput(inputId = "straf3b", label="Allele 3B", value="20", width = 180, min = 0, max = 400),
-    numericInput(inputId = "straf3c", label="Allele 3C", value="20", width = 180, min = 0, max = 400),
-    numericInput(inputId = "straf4a", label="Allele 4A", value="20", width = 180, min = 0, max = 400),
+    numericInput(inputId = "straf2a", label="Allele 2A", value="17", width = 180, min = 0, max = 400),
+    numericInput(inputId = "straf2b", label="Allele 2B", value="55", width = 180, min = 0, max = 400),
+    numericInput(inputId = "straf2c", label="Allele 2C", value="18", width = 180, min = 0, max = 400),
+    numericInput(inputId = "straf3a", label="Allele 3A", value="55", width = 180, min = 0, max = 400),
+    numericInput(inputId = "straf3b", label="Allele 3B", value="89", width = 180, min = 0, max = 400),
+    numericInput(inputId = "straf3c", label="Allele 3C", value="11", width = 180, min = 0, max = 400),
+    numericInput(inputId = "straf4a", label="Allele 4A", value="55", width = 180, min = 0, max = 400),
     numericInput(inputId = "straf4b", label="Allele 4B", value="20", width = 180, min = 0, max = 400),
-    numericInput(inputId = "straf4c", label="Allele 4C", value="20", width = 180, min = 0, max = 400),
+    numericInput(inputId = "straf4c", label="Allele 4C", value="18", width = 180, min = 0, max = 400),
     actionButton("goButton","Enter :)")),
   
   dashboardBody(
     tabsetPanel(type = "tabs",
                 tabPanel("Table", dataTableOutput("table")),
                 tabPanel("Genind", verbatimTextOutput("genind")),
-                tabPanel("Print", verbatimTextOutput("print")),
+                tabPanel("Print", withSpinner(verbatimTextOutput("print"), type = 7, color = "#3C8DBC")),
                 tabPanel("PCA", plotOutput("pca")),
                 tabPanel("DAPC", plotOutput("dapc")),
                 tabPanel("Result", verbatimTextOutput("result"))
@@ -73,21 +76,25 @@ server <- function(input, output) {
       #values$df <- data.frame(values$df, stringsAsFactors = FALSE)
     }
   })
-  obj <- reactive({df2genind(values$df[,2:10], ploidy = 1, NA.char = "NA",  sep = "", pop = values$df$Population)})
+  obj <- reactive({df2genind(values$df[,2:10], ploidy = 1, NA.char = "NA",  sep = "")})
   #obj()@pop <- reactive({values$df$Alelle})
   #obj@pop <- reactive({values$df})
   
   #reactive({pop(obj()) <- db$Allele})
-  x <- reactive({scaleGen(obj(), NA.method="mean")})
-  #pca <- reactive({dudi.pca(x(), cent = FALSE, scale = FALSE, scannf = FALSE, nf = 3)})
-  pca <- reactive({prcomp(x())})
-  dapc <- reactive({dapc.genind(obj(), n.pca = 3, n.da = nPop(obj()))})
+  #x <- reactive({scaleGen(obj(), NA.method="mean")})
+ 
+  snap <- reactive({res <- snapclust(obj(), k = 2, hybrids = TRUE)})
+  str <- reactive({cbind(as.data.frame(snap()$group), values$df)})
   
+  pca <- reactive({dudi.pca(x(), cent = FALSE, scale = FALSE, scannf = FALSE, nf = 3)})
+  pca <- reactive({prcomp(x())})
+  #dapc <- reactive({dapc.genind(obj(), n.pca = 3, n.da = nPop(obj()))})
   
   output$table <- renderDataTable({values$df})
-  output$pca <- renderPlot({autoplot(pca(), x = 1, y = 3, frame = TRUE, frame.type = 'norm', data = values$df, colour = "Population")})
+  output$pca <- renderPlot({autoplot(pca(), x = 1, y = 3, frame = TRUE, frame.type = 'norm', data = str(), colour = "snap()$group", shape = "Source")})
   output$dapc <- renderPlot({scatter(dapc(), cell = 1, mstree = T, lwd = 3, lty = 1, cex = 0.8, solid = 1, legend = T)})
-  output$print <- renderPrint({print(dapc())})
+  #output$print <- renderPrint({print(dapc())})
+  output$print <- renderPrint({print(tail(str()))})
   output$genind <- renderPrint({print(obj())})
   output$result <- renderPrint({print("if else thingy --- Your strain fits into Genetic cluster ?? and has a higher chance of being resistant to azole antifungals")})
 }
