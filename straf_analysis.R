@@ -48,7 +48,7 @@ ui = dashboardPage(
                 tabPanel("Table", dataTableOutput("table")),
                 tabPanel("Genind", verbatimTextOutput("genind")),
                 tabPanel("Print", withSpinner(verbatimTextOutput("print"), type = 7, color = "#3C8DBC")),
-                tabPanel("PCA", plotOutput("pca")),
+                tabPanel("PCA", withSpinner(plotOutput("pca"), type = 7, color = "#3C8DBC")),
                 tabPanel("DAPC", plotOutput("dapc")),
                 tabPanel("Result", verbatimTextOutput("result"))
     )
@@ -76,27 +76,35 @@ server <- function(input, output) {
       #values$df <- data.frame(values$df, stringsAsFactors = FALSE)
     }
   })
-  obj <- reactive({df2genind(values$df[,2:10], ploidy = 1, NA.char = "NA",  sep = "")})
+  obj <- reactive({df2genind(values$df[,3:11], ploidy = 1, NA.char = "NA",  sep = "")})
   #obj()@pop <- reactive({values$df$Alelle})
   #obj@pop <- reactive({values$df})
   
   #reactive({pop(obj()) <- db$Allele})
-  #x <- reactive({scaleGen(obj(), NA.method="mean")})
- 
-  snap <- reactive({res <- snapclust(obj(), k = 2, hybrids = TRUE)})
-  str <- reactive({cbind(as.data.frame(snap()$group), values$df)})
   
-  pca <- reactive({dudi.pca(x(), cent = FALSE, scale = FALSE, scannf = FALSE, nf = 3)})
+  snap <- reactive({snapclust(obj(), k = 2, hybrids = TRUE, parent.lab = c("Pop_A", "Pop_B"))})
+ # str <- reactive({cbind(Population = c(as.data.frame(snap()$group), values$df)}))
+  str <- reactive({cbind(setNames(as.data.frame(snap()$group), nm = "Population"), values$df)})
+  
+  #colnames(str()[1]) <- "Population"
+  
+  
+  x <- reactive({scaleGen(obj(), NA.method="mean")})
   pca <- reactive({prcomp(x())})
   #dapc <- reactive({dapc.genind(obj(), n.pca = 3, n.da = nPop(obj()))})
   
   output$table <- renderDataTable({values$df})
-  output$pca <- renderPlot({autoplot(pca(), x = 1, y = 3, frame = TRUE, frame.type = 'norm', data = str(), colour = "snap()$group", shape = "Source")})
-  output$dapc <- renderPlot({scatter(dapc(), cell = 1, mstree = T, lwd = 3, lty = 1, cex = 0.8, solid = 1, legend = T)})
+  output$pca <- renderPlot({autoplot(pca(), x = 3, y = 1, frame = TRUE, frame.type = 'norm', 
+                                     data = str(), colour = "Population", shape = "Source")})
+  
+  
+  
+  #output$dapc <- renderPlot({scatter(dapc(), cell = 1, mstree = T, lwd = 3, lty = 1, cex = 0.8, solid = 1, legend = T)})
   #output$print <- renderPrint({print(dapc())})
   output$print <- renderPrint({print(tail(str()))})
   output$genind <- renderPrint({print(obj())})
-  output$result <- renderPrint({print("if else thingy --- Your strain fits into Genetic cluster ?? and has a higher chance of being resistant to azole antifungals")})
+  output$result <- renderPrint({print("if else thingy --- Your strain fits into Genetic cluster \
+                                      ?? and has a higher chance of being resistant to azole antifungals")})
 }
 
 
